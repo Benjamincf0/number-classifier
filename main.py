@@ -9,7 +9,7 @@ train_X = np.reshape(train_X, (train_X.shape[0], train_X.shape[1]*train_X.shape[
 
 # print(train_X.shape, train_y.shape)
 num_model = ai.Model()
-print(num_model.train(train_X, train_y))
+print(num_model.train(train_X, train_y)['curr_activations'])
 
 # Example file showing a basic pygame "game loop"
 # pygame setup

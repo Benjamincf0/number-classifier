@@ -8,18 +8,19 @@ class reluClass:
         return np.maximum(0, x)
     def prime(self, x):
         return np.where(x > 0, 1, 0)
-    
+
 class softmaxClass:
     def __call__(self, x):
         max = np.max(x)
         exp_x = np.exp(x - max)
         return exp_x / np.sum(exp_x)
     def prime(self, x):
-        s = softmax(x)  # Softmax output vector
+        s = self.__call__(x)  # Softmax output vector
         jacobian = np.diag(s) - np.outer(s, s)
         return jacobian
     
 relu = reluClass()
+softmax = softmaxClass()
 
 
 # def relu(x):
@@ -72,6 +73,11 @@ class Model:
         # Adding biases as an an attribute to this instance of Model
         self.biases = biases
 
+        # Activations
+        if not self.activation_functions:
+            self.activation_functions = [relu]*(len(self.dim) - 1)
+            # fns.append(softmax)
+
 
     def __str__(self):
         output = f'\nNeural Network:\n'
@@ -98,11 +104,7 @@ class Model:
 
     def forward_prop(self, input_layer):
         L_i = input_layer
-        if not self.activation_functions:
-            fns = [relu]*(len(self.dim) - 1)
-            # fns.append(softmax)
-        else:
-            fns = self.activation_functions
+        fns = self.activation_functions
 
         # print(f"L_i: {L_i}")
         for i in range(len(fns)):
@@ -132,29 +134,41 @@ class Model:
         prev_cost = 2
         print(f"train_X.shape[0] {train_X.shape[0]}\nbatch_size {batch_size}")
         while True:
-            # time.sleep(0.001)
-            y_sample = self.forward_prop(train_X[sample_index])
-            y_label = np.zeros(self.dim[-1])
-            y_label[train_Y[sample_index]] = 1
-            gradient += (y_label - y_sample)**2
+            
+            # y_sample = self.forward_prop(train_X[sample_index])
+            # y_label = np.zeros(self.dim[-1])
+            # y_label[train_Y[sample_index]] = 1
+            # cost += (y_label - y_sample)**2
+            
+            activations = np.array(['hello world'])
+            L_i = train_X[sample_index]
+            np.append(activations, L_i)
+            fns = self.activation_functions
+
+            # print(f"L_i: {L_i}")
+            for i in range(len(fns)):
+                L_i = fns[i]((np.dot(self.weights[i], L_i)) + self.biases[i])
+                np.append(activations, L_i)
+                # print(f"L_i: {L_i}")
 
             # Check if Batch is complete
             if (sample_index + 1) % batch_size == 0:
-                sys.stdout.write(f"\rBatch: {batch_index+1}   Epoch: {epoch_index}   Accuracy: {accuracy}   Cost: {cost}")
                 batch_index += 1
+                sys.stdout.write(f"\rBatch: {batch_index}   Epoch: {epoch_index}   Accuracy: {accuracy}   Cost: {cost}")
                 # self.backward_prop(gradient/(sample_index + 1), learning_rate)
 
             # Check if Epoch is complete
             if sample_index + 1 == train_X.shape[0]:
-                sys.stdout.write(f"\rBatch: {batch_index}   Epoch: {epoch_index+1}   Accuracy: {accuracy}   Cost: {cost}")
-                if epoch_index + 1 == 10 or prev_accuracy == accuracy:
+                epoch_index += 1
+                sys.stdout.write(f"\rBatch: {batch_index}   Epoch: {epoch_index}   Accuracy: {accuracy}   Cost: {cost}")
+                if epoch_index == 2 or prev_accuracy == accuracy:
                     print('\nDone!     ')
                     return {
                         'batch_index': batch_index,
                         'epoch_index': epoch_index,
-                        'example' : f"y_sample: {y_sample}\ny_label: {y_label}",
+                        'curr_activations': activations,
+                        # 'example' : f"y_sample: {y_sample}\ny_label: {y_label}",
                     }
-                epoch_index += 1
                 sample_index = 0
 
             sample_index += 1
