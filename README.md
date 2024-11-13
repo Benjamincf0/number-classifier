@@ -1,4 +1,4 @@
 # number-classifier
 
 
-Hello there
+Deep Learning Handwritten Digit Classifier Project
