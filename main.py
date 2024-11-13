@@ -1,8 +1,7 @@
-import math
 import pygame
 import aiLib as ai
 import numpy as np
-from keras.datasets import mnist
+from keras.datasets import mnist # type: ignore
 
 (train_X, train_y), (test_X, test_y) = mnist.load_data()
 # print(train_X.shape, train_y.shape)
