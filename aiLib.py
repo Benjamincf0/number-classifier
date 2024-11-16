@@ -18,6 +18,9 @@ class softmaxClass:
         s = self.__call__(x)  # Softmax output vector
         jacobian = np.diag(s) - np.outer(s, s)
         return jacobian
+
+def sigmoid(z):
+    return 1/(1+np.exp(-z))
     
 relu = reluClass()
 softmax = softmaxClass()
@@ -56,18 +59,16 @@ class Model:
         self.activation_functions = activation_functions
         Model.count_inst += 1
 
+        np.random.seed(SEED)
         # INITALIZING WEIGHTS
-        rng = np.random.seed(SEED)
         weights = []
-        # INIT BIASES
         biases = []
-
         # Adding weights to numpy array
         for i in range(1, len(dim)):
             # Initializing weights according to He Init.
             weights.append(np.sqrt(2 / dim[i-1])*np.random.randn(dim[i], dim[i-1]))
             # Initing biases to 0
-            biases.append(np.zeros(dim[i]))
+            biases.append(np.zeros((dim[i], 1)))
         # Adding weights as an an attribute to this instance of Model
         self.weights = weights
         # Adding biases as an an attribute to this instance of Model
@@ -75,9 +76,8 @@ class Model:
 
         # Activations
         if not self.activation_functions:
-            self.activation_functions = [relu]*(len(self.dim) - 1)
+            self.activation_functions = [sigmoid]*(len(self.dim) - 1)
             # fns.append(softmax)
-
 
     def __str__(self):
         output = f'\nNeural Network:\n'
@@ -103,7 +103,7 @@ class Model:
         return output
 
     def forward_prop(self, input_layer):
-        L_i = input_layer
+        L_i = input_layer.reshape(-1, 1)
         fns = self.activation_functions
 
         # print(f"L_i: {L_i}")
@@ -121,59 +121,104 @@ class Model:
         for l in range(len(self.dim-1))[::-1]:
             return 
 
-    def train(self, train_X, train_Y, batch_size=None, learning_rate = 1, verbose = False):
+    def train(self, train_x, train_y, test_x, test_y, batch_size=None, learning_rate = 0.05, verbose = False):
         if not batch_size:
-            batch_size = 100
+            batch_size = 200
         batch_index = 0
         sample_index = 0
         epoch_index = 0
-        gradient = 0
+        grad_w = []
+        grad_b = []
         prev_accuracy = -1
-        accuracy = 0
+        accuracy = accuracy = self.test(test_x, test_y)
         cost = 1
         prev_cost = 2
-        print(f"train_X.shape[0] {train_X.shape[0]}\nbatch_size {batch_size}")
+        gradient_w = [0]*(len(self.dim) - 1)
+        print(f"train_x.shape[0] {train_x.shape[0]}\nbatch_size {batch_size}")
+        cost = 0
+
+        # Training loop
         while True:
-            
-            # y_sample = self.forward_prop(train_X[sample_index])
-            # y_label = np.zeros(self.dim[-1])
-            # y_label[train_Y[sample_index]] = 1
+            # y_sample = self.forward_prop(train_x[sample_index])
+            y_label = np.zeros(self.dim[-1])
+            y_label[train_y[sample_index]] = 1
             # cost += (y_label - y_sample)**2
             
-            activations = np.array(['hello world'])
-            L_i = train_X[sample_index]
-            np.append(activations, L_i)
+            L_i = train_x[sample_index]
+            activations = [L_i]
             fns = self.activation_functions
 
-            # print(f"L_i: {L_i}")
-            for i in range(len(fns)):
+            # Forward prop, saving all activations
+            for i in range(len(self.dim) - 1):
                 L_i = fns[i]((np.dot(self.weights[i], L_i)) + self.biases[i])
-                np.append(activations, L_i)
-                # print(f"L_i: {L_i}")
+                activations.append(L_i)
+            # activations.append(y_label)
+            
+            # Computing cost
+            cost += np.sum((y_label - activations[-1])**2)
+
+            #Backward propagation to find gradient
+            dL = 2*(y_label - activations[-1])*activations[-1]*(1-activations[-1])
+            dL_list = [dL]
+            # print(len(activations), activations[0].shape, activations[1].shape, activations[2].shape, activations[3].shape)
+            for l in range(len(self.dim)-1)[::-1]:
+                # grad_w_l = 2*activations[l-1]*(activations[l] - y_label)*softmax.prime(((np.dot(self.weights[l], activations[l-1])) + self.biases[l]))
+                dL = np.dot(dL_list[-1], self.weights[l])*activations[l]*(1-activations[l])
+                dL_list.append(dL)
+                # grad_w.append(grad_w_l)
+            
+            # Compute gradients for weights and biases and do parameters - gradient
+            sample_grad = []
+            for l in range(len(self.dim)-1):
+                delta = - np.dot(dL_list[-l - 1], activations[l])*learning_rate
+                sample_grad.append(delta)
+                gradient_w[l] += delta
+                # self.biases[l] -= dL_list[l - 1]
 
             # Check if Batch is complete
             if (sample_index + 1) % batch_size == 0:
                 batch_index += 1
+                #Gradient descent
+                for i in range(len(gradient_w)):
+                    self.weights[i] -= gradient_w[i] / batch_size
+                gradient_w = [0]*(len(self.dim) - 1)
+                cost /= batch_size
+                # Verbose
                 sys.stdout.write(f"\rBatch: {batch_index}   Epoch: {epoch_index}   Accuracy: {accuracy}   Cost: {cost}")
-                # self.backward_prop(gradient/(sample_index + 1), learning_rate)
 
             # Check if Epoch is complete
-            if sample_index + 1 == train_X.shape[0]:
+            if sample_index + 1 == train_x.shape[0]:
                 epoch_index += 1
+                accuracy = self.test(test_x, test_y)
                 sys.stdout.write(f"\rBatch: {batch_index}   Epoch: {epoch_index}   Accuracy: {accuracy}   Cost: {cost}")
-                if epoch_index == 2 or prev_accuracy == accuracy:
+                if epoch_index == 200 or abs(prev_accuracy - accuracy) < 1:
                     print('\nDone!     ')
                     return {
                         'batch_index': batch_index,
                         'epoch_index': epoch_index,
-                        'curr_activations': activations,
+                        'activations': len(activations),
                         # 'example' : f"y_sample: {y_sample}\ny_label: {y_label}",
                     }
                 sample_index = 0
 
             sample_index += 1
                 
+    def test(self, test_x, test_y):
+        """Tests model's accuracy on training set and returns the ratio of correct inferences over the total number of inferences
 
+        Args:
+            test_x (np.ndarray): inputs
+            test_y (np.ndarray): labels
+
+        Returns:
+            double: ratio of correct/total inferences 
+        """
+        correct_inferences = 0
+        for i in range(test_x.shape[0]):
+            if np.argmax(self.forward_prop(test_x[i])) ==  test_y[i]:
+                correct_inferences += 1
+        print('\nTest Complete')
+        return correct_inferences / test_x.shape[0]
 
 # When running this module as the main program
 def main():
@@ -188,7 +233,7 @@ def main():
         print(f'{text}\nWeights: {my_model.weights[i].shape}\nBiases: {my_model.biases[i].shape}\nBiases dimension: {my_model.biases[i].ndim}\n')
 
     print('\nNOW RUNNING FORWARD PROP\n')
-    print(f'Here is the output:\n{my_model.forward_prop([0.5]*784)}')
+    print(f'Here is the output:\n{my_model.forward_prop(np.array([0.5]*784))}')
 
 #TESTINNGGGG
 if __name__ == '__main__':
